@@ -60,11 +60,9 @@ func (p *ProxyManager) RandomProxy() (string, error) {
 		return "", errors.New("ProxyManager.Proxies is empty, load proxies")
 	}
 
-	// Create a new random source and generator
 	source := rand.NewSource(time.Now().UnixNano())
 	random := rand.New(source)
 
-	// Select a random proxy
 	return formatProxy(p.Proxies[random.Intn(len(p.Proxies))]), nil
 }
 
