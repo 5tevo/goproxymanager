@@ -5,7 +5,7 @@ From the ProxyManager object, you can grab either a random proxy, or sequentiall
 
 ### Installation
 ```
-go get github.com/5tevo/goproxymanager-master
+go get github.com/5tevo/goproxymanager
 ```
 
 ### Usage
@@ -14,7 +14,7 @@ Initialize new object
 ```golang
 package main 
 
-import proxymanager "github.com/5tevo/goproxymanager-master"
+import proxymanager "github.com/5tevo/goproxymanager"
 
 func main() {
     manager, err := proxymanager.NewManager("proxies.txt")
