@@ -5,7 +5,7 @@ From the ProxyManager object, you can grab either a random proxy, or sequentiall
 
 ### Installation
 ```
-go get github.com/aiomonitors/goproxymanager
+go get github.com/5tevo/goproxymanager-master
 ```
 
 ### Usage
