@@ -14,7 +14,7 @@ Initialize new object
 ```golang
 package main 
 
-import "github.com/aiomonitors/goproxymanager"
+import proxymanager "github.com/5tevo/goproxymanager-master"
 
 func main() {
     manager, err := proxymanager.NewManager("proxies.txt")
