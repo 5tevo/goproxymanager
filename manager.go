@@ -1,17 +1,17 @@
 package proxymanager
 
 import (
-	"os"
 	"bufio"
 	"errors"
-	"math/rand"
-	"time"
-	"strings"
 	"fmt"
+	"math/rand"
+	"os"
+	"strings"
+	"time"
 )
 
 type ProxyManager struct {
-	Proxies []string
+	Proxies      []string
 	CurrentIndex int
 }
 
@@ -48,16 +48,11 @@ func (p *ProxyManager) NextProxy() (string, error) {
 		return "", errors.New("ProxyManager.Proxies is empty, load proxies")
 	}
 
-	p.CurrentIndex++ //increases current index by one
-	if p.CurrentIndex > len(p.Proxies) - 1 { 
-		p.CurrentIndex = 0 //sets index to 0 if greater than length
+	p.CurrentIndex++
+	if p.CurrentIndex > len(p.Proxies)-1 {
+		p.CurrentIndex = 0
 	}
-	proxy := p.Proxies[p.CurrentIndex]
-	if len(strings.Split(proxy, ":")) == 4 {
-		splitStr := strings.Split(proxy, ":")
-		proxy = fmt.Sprintf("http://%s:%s@%s:%s", splitStr[2], splitStr[3], splitStr[0], splitStr[1])
-	}
-	return proxy, nil
+	return formatProxy(p.Proxies[p.CurrentIndex]), nil
 }
 
 func (p *ProxyManager) RandomProxy() (string, error) {
@@ -65,6 +60,18 @@ func (p *ProxyManager) RandomProxy() (string, error) {
 		return "", errors.New("ProxyManager.Proxies is empty, load proxies")
 	}
 
-	rand.Seed(time.Now().UnixNano())
-	return p.Proxies[rand.Intn(len(p.Proxies))], nil
+	// Create a new random source and generator
+	source := rand.NewSource(time.Now().UnixNano())
+	random := rand.New(source)
+
+	// Select a random proxy
+	return formatProxy(p.Proxies[random.Intn(len(p.Proxies))]), nil
+}
+
+func formatProxy(proxy string) string {
+	parts := strings.Split(proxy, ":")
+	if len(parts) == 4 {
+		return fmt.Sprintf("http://%s:%s@%s:%s", parts[2], parts[3], parts[0], parts[1])
+	}
+	return proxy
 }
