@@ -7,63 +7,146 @@ import (
 	"math/rand"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
 type ProxyManager struct {
+	mu           sync.Mutex
 	Proxies      []string
-	CurrentIndex int
+	used         []bool
+	currentIndex int
+	r            *rand.Rand
 }
 
 func NewManager(filename string) (*ProxyManager, error) {
-	file, openErr := os.Open(filename)
-	if openErr != nil {
-		return nil, openErr
+	pm := &ProxyManager{
+		Proxies:      make([]string, 0),
+		currentIndex: 0,
+		r:            rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
-	defer file.Close()
-	manager := &ProxyManager{Proxies: []string{}, CurrentIndex: 0}
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		manager.Proxies = append(manager.Proxies, scanner.Text())
+	if err := pm.LoadProxies(filename); err != nil {
+		return nil, err
 	}
-	return manager, scanner.Err()
+	pm.shuffleProxies()
+	pm.used = make([]bool, len(pm.Proxies))
+	pm.currentIndex = 0
+	return pm, nil
 }
 
 func (p *ProxyManager) LoadProxies(filename string) error {
-	p.Proxies = []string{}
-	file, openErr := os.Open(filename)
-	if openErr != nil {
-		return openErr
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
 	}
 	defer file.Close()
+
+	var proxies []string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		p.Proxies = append(p.Proxies, scanner.Text())
+		proxy := strings.TrimSpace(scanner.Text())
+		if proxy != "" {
+			proxies = append(proxies, proxy)
+		}
 	}
-	return scanner.Err()
+	if scannerErr := scanner.Err(); scannerErr != nil {
+		return scannerErr
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.Proxies = proxies
+	p.currentIndex = 0
+	p.used = make([]bool, len(proxies))
+	return nil
 }
 
-func (p *ProxyManager) NextProxy() (string, error) {
-	if len(p.Proxies) == 0 {
-		return "", errors.New("ProxyManager.Proxies is empty, load proxies")
+func (p *ProxyManager) shuffleProxies() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.r.Shuffle(len(p.Proxies), func(i, j int) {
+		p.Proxies[i], p.Proxies[j] = p.Proxies[j], p.Proxies[i]
+	})
+}
+
+func (p *ProxyManager) AssignProxy() (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for i := p.currentIndex; i < len(p.Proxies); i++ {
+		if !p.used[i] {
+			p.used[i] = true
+			p.currentIndex = i + 1
+			return formatProxy(p.Proxies[i]), nil
+		}
+	}
+	for i := 0; i < p.currentIndex; i++ {
+		if !p.used[i] {
+			p.used[i] = true
+			p.currentIndex = i + 1
+			return formatProxy(p.Proxies[i]), nil
+		}
+	}
+	index := p.r.Intn(len(p.Proxies))
+	return formatProxy(p.Proxies[index]), nil
+}
+
+func (p *ProxyManager) NextProxy(current string) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for i, raw := range p.Proxies {
+		if formatProxy(raw) == current {
+			p.used[i] = false
+			break
+		}
 	}
 
-	p.CurrentIndex++
-	if p.CurrentIndex > len(p.Proxies)-1 {
-		p.CurrentIndex = 0
+	var candidate string
+	for i := p.currentIndex; i < len(p.Proxies); i++ {
+		formatted := formatProxy(p.Proxies[i])
+		if !p.used[i] && formatted != current {
+			p.used[i] = true
+			candidate = formatted
+			p.currentIndex = i + 1
+			break
+		}
 	}
-	return formatProxy(p.Proxies[p.CurrentIndex]), nil
+	if candidate == "" {
+		for i := 0; i < p.currentIndex; i++ {
+			formatted := formatProxy(p.Proxies[i])
+			if !p.used[i] && formatted != current {
+				p.used[i] = true
+				candidate = formatted
+				p.currentIndex = i + 1
+				break
+			}
+		}
+	}
+	if candidate == "" {
+		index := p.r.Intn(len(p.Proxies))
+		candidate = formatProxy(p.Proxies[index])
+	}
+	return candidate, nil
 }
 
 func (p *ProxyManager) RandomProxy() (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if len(p.Proxies) == 0 {
-		return "", errors.New("ProxyManager.Proxies is empty, load proxies")
+		return "", errors.New("no proxies loaded")
 	}
+	index := p.r.Intn(len(p.Proxies))
+	return formatProxy(p.Proxies[index]), nil
+}
 
-	source := rand.NewSource(time.Now().UnixNano())
-	random := rand.New(source)
-
-	return formatProxy(p.Proxies[random.Intn(len(p.Proxies))]), nil
+func (p *ProxyManager) GetProxies() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	proxiesCopy := make([]string, len(p.Proxies))
+	for i, proxy := range p.Proxies {
+		proxiesCopy[i] = formatProxy(proxy)
+	}
+	return proxiesCopy
 }
 
 func formatProxy(proxy string) string {
