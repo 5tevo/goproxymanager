@@ -2,6 +2,7 @@ package proxymanager
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -58,16 +59,16 @@ func NewManager(filename string) (*ProxyManager, error) {
 	}, nil
 }
 
-func (pm *ProxyManager) AssignProxy() string {
+func (pm *ProxyManager) AssignProxy() (string, error) {
 	select {
 	case proxy := <-pm.pool:
-		return proxy
+		return proxy, nil
 	default:
 		return pm.RandomProxy()
 	}
 }
 
-func (pm *ProxyManager) NextProxy(current string) string {
+func (pm *ProxyManager) NextProxy(current string) (string, error) {
 	select {
 	case pm.pool <- current:
 	default:
@@ -77,19 +78,30 @@ func (pm *ProxyManager) NextProxy(current string) string {
 	select {
 	case newProxy = <-pm.pool:
 	default:
-		newProxy = pm.RandomProxy()
+		var err error
+		newProxy, err = pm.RandomProxy()
+		if err != nil {
+			return "", err
+		}
 	}
 
 	if newProxy == current && len(pm.proxies) > 1 {
-		newProxy = pm.RandomProxy()
+		var err error
+		newProxy, err = pm.RandomProxy()
+		if err != nil {
+			return "", err
+		}
 	}
-	return newProxy
+	return newProxy, nil
 }
 
-func (pm *ProxyManager) RandomProxy() string {
+func (pm *ProxyManager) RandomProxy() (string, error) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	return pm.proxies[pm.r.Intn(len(pm.proxies))]
+	if len(pm.proxies) == 0 {
+		return "", errors.New("no proxies available")
+	}
+	return pm.proxies[pm.r.Intn(len(pm.proxies))], nil
 }
 
 func (pm *ProxyManager) GetProxies() []string {

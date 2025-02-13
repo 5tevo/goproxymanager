@@ -39,7 +39,7 @@ func main() {
     }
 
     // Gets next proxy in the manager & passes in the current proxy releasing it formatted http://username:password@ip:port
-    proxy, _ = pm.NextProxy(proxy)
+    proxy, err = pm.NextProxy(proxy)
     if err != nil{
         fmt.Printf("Error obtaining next proxy: %v", err)
     }
