@@ -28,7 +28,7 @@ func NewManager(filename string) (*ProxyManager, error) {
 	var raw []string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		proxy := strings.TrimSpace(scanner.Text())
+		proxy := strings.ReplaceAll(scanner.Text(), " ", "")
 		if proxy != "" {
 			raw = append(raw, proxy)
 		}
